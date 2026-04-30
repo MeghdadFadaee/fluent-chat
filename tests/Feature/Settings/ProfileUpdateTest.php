@@ -2,10 +2,7 @@
 
 use App\Livewire\Settings\Profile;
 use App\Models\User;
-use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Livewire\Livewire;
-
-uses(LazilyRefreshDatabase::class);
 
 test('profile page is displayed', function () {
     $this->actingAs($user = User::factory()->create());

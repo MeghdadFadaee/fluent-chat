@@ -9,12 +9,9 @@ use App\Models\Conversation;
 use App\Models\ConversationParticipant;
 use App\Models\Message;
 use App\Models\User;
-use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
-
-uses(LazilyRefreshDatabase::class);
 
 test('authenticated users can visit the chat dashboard', function () {
     $user = User::factory()->create();

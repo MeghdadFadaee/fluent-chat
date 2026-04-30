@@ -1,9 +1,6 @@
 <?php
 
 use App\Models\User;
-use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
-
-uses(LazilyRefreshDatabase::class);
 
 test('guests are redirected to the login page', function () {
     $response = $this->get(route('dashboard'));
