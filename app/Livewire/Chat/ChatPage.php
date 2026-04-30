@@ -6,10 +6,12 @@ use App\Models\Conversation;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
+#[Layout('layouts::chat')]
 #[Title('Chat')]
 class ChatPage extends Component
 {

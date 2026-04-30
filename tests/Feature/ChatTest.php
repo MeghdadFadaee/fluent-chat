@@ -1,8 +1,8 @@
 <?php
 
-use App\Livewire\Chat\ConversationList;
 use App\Livewire\Chat\ConversationDetailsPanel;
 use App\Livewire\Chat\ConversationHeader;
+use App\Livewire\Chat\ConversationList;
 use App\Livewire\Chat\ConversationView;
 use App\Livewire\Chat\MessageComposer;
 use App\Models\Conversation;
@@ -20,7 +20,9 @@ test('authenticated users can visit the chat dashboard', function () {
     $this->actingAs($user)
         ->get(route('dashboard'))
         ->assertOk()
-        ->assertSee('Inbox');
+        ->assertSee('Inbox')
+        ->assertDontSee('Repository')
+        ->assertDontSee('Documentation');
 });
 
 test('conversation list only shows conversations the user participates in', function () {

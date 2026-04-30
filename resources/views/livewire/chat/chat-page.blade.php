@@ -1,4 +1,4 @@
-<section class="mx-auto flex h-[calc(100vh-5.5rem)] min-h-[620px] w-full max-w-[1600px] overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-950">
+<section class="flex h-full min-h-0 w-full overflow-hidden border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950 sm:rounded-xl">
     <aside
         @class([
             'h-full w-full shrink-0 border-zinc-200 bg-zinc-50/80 dark:border-zinc-800 dark:bg-zinc-900/70 md:flex md:w-[22rem] lg:w-96',
