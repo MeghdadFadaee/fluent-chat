@@ -45,6 +45,14 @@ class ConversationView extends Component
         $this->markAsRead();
     }
 
+    #[On('conversation-updated')]
+    public function refreshConversation(int $conversationId): void
+    {
+        if ($conversationId === $this->conversationId) {
+            unset($this->conversation);
+        }
+    }
+
     #[Computed]
     public function conversation(): Conversation
     {

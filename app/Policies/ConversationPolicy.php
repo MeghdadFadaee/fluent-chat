@@ -72,6 +72,22 @@ class ConversationPolicy
         return $this->participates($user, $conversation);
     }
 
+    public function addMembers(User $user, Conversation $conversation): bool
+    {
+        if (! $this->participates($user, $conversation)) {
+            return false;
+        }
+
+        if (! $conversation->isGroup()) {
+            return true;
+        }
+
+        return $conversation->participants()
+            ->where('user_id', $user->id)
+            ->where('role', ConversationParticipant::RoleAdmin)
+            ->exists();
+    }
+
     private function participates(User $user, Conversation $conversation): bool
     {
         return $conversation->participants()

@@ -17,7 +17,7 @@ class ChatPage extends Component
 {
     public ?int $selectedConversationId = null;
 
-    public bool $detailsPanelOpen = true;
+    public bool $detailsPanelOpen = false;
 
     #[On('conversation-selected')]
     public function selectConversation(int $conversationId): void
@@ -29,7 +29,7 @@ class ChatPage extends Component
         Gate::authorize('view', $conversation);
 
         $this->selectedConversationId = $conversation->id;
-        $this->detailsPanelOpen = true;
+        $this->detailsPanelOpen = false;
     }
 
     #[On('conversation-closed')]

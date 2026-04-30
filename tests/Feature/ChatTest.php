@@ -20,7 +20,7 @@ test('authenticated users can visit the chat dashboard', function () {
     $this->actingAs($user)
         ->get(route('dashboard'))
         ->assertOk()
-        ->assertSee('Inbox')
+        ->assertSee('Messages')
         ->assertSee('Profile settings')
         ->assertSee('Password and 2FA')
         ->assertDontSee('Repository')
@@ -41,9 +41,9 @@ test('conversation list only shows conversations the user participates in', func
     ConversationParticipant::factory()->for($visibleConversation)->for($teammate)->create();
 
     $hiddenConversation = Conversation::factory()
-        ->direct()
+        ->group()
         ->for($outsider, 'creator')
-        ->create();
+        ->create(['name' => 'Hidden Group']);
 
     ConversationParticipant::factory()->for($hiddenConversation)->for($outsider)->create();
 
@@ -52,7 +52,53 @@ test('conversation list only shows conversations the user participates in', func
     Livewire::test(ConversationList::class)
         ->assertSee('Visible Teammate')
         ->assertSee('Opening')
-        ->assertDontSee('Hidden Teammate');
+        ->assertDontSee('Hidden Group');
+});
+
+test('users can create direct conversations', function () {
+    $user = User::factory()->create();
+    $teammate = User::factory()->create(['name' => 'Direct Partner']);
+
+    $this->actingAs($user);
+
+    Livewire::test(ConversationList::class)
+        ->call('openCreateConversation')
+        ->call('toggleMember', $teammate->id)
+        ->call('createConversation')
+        ->assertHasNoErrors();
+
+    $conversation = Conversation::query()
+        ->where('type', Conversation::TypeDirect)
+        ->whereHas('participants', fn ($query) => $query->where('user_id', $user->id))
+        ->whereHas('participants', fn ($query) => $query->where('user_id', $teammate->id))
+        ->first();
+
+    expect($conversation)->not->toBeNull();
+    expect($conversation->participants()->count())->toBe(2);
+});
+
+test('users can create group conversations with members', function () {
+    $user = User::factory()->create();
+    $firstMember = User::factory()->create(['name' => 'Launch Lead']);
+    $secondMember = User::factory()->create(['name' => 'Design Lead']);
+
+    $this->actingAs($user);
+
+    Livewire::test(ConversationList::class)
+        ->set('createType', Conversation::TypeGroup)
+        ->set('groupName', 'Launch Room')
+        ->call('toggleMember', $firstMember->id)
+        ->call('toggleMember', $secondMember->id)
+        ->call('createConversation')
+        ->assertHasNoErrors();
+
+    $conversation = Conversation::query()
+        ->where('type', Conversation::TypeGroup)
+        ->where('name', 'Launch Room')
+        ->first();
+
+    expect($conversation)->not->toBeNull();
+    expect($conversation->participants()->count())->toBe(3);
 });
 
 test('participants can send messages', function () {
@@ -76,6 +122,34 @@ test('participants can send messages', function () {
         ->where('user_id', $user->id)
         ->where('body', 'This looks ready to ship.')
         ->exists())->toBeTrue();
+});
+
+test('participants can add people to a direct conversation', function () {
+    $user = User::factory()->create();
+    $teammate = User::factory()->create(['name' => 'Mina Partner']);
+    $newMember = User::factory()->create(['name' => 'Nima Added']);
+    $conversation = Conversation::factory()
+        ->direct()
+        ->for($user, 'creator')
+        ->create();
+
+    ConversationParticipant::factory()->for($conversation)->for($user)->create();
+    ConversationParticipant::factory()->for($conversation)->for($teammate)->create();
+
+    $this->actingAs($user);
+
+    Livewire::test(ConversationDetailsPanel::class, ['conversationId' => $conversation->id])
+        ->call('openAddMembers')
+        ->set('groupName', 'Project Room')
+        ->call('toggleMember', $newMember->id)
+        ->call('addMembers')
+        ->assertHasNoErrors();
+
+    $conversation->refresh();
+
+    expect($conversation->type)->toBe(Conversation::TypeGroup);
+    expect($conversation->name)->toBe('Project Room');
+    expect($conversation->participants()->where('user_id', $newMember->id)->exists())->toBeTrue();
 });
 
 test('selected conversations render the stream header and details', function () {

@@ -6,10 +6,14 @@ use App\Models\Conversation;
 use App\Models\ConversationParticipant;
 use App\Models\User;
 use Carbon\CarbonInterface;
+use Flux\Flux;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -20,7 +24,24 @@ class ConversationList extends Component
 
     public string $search = '';
 
+    public bool $showCreateConversationModal = false;
+
+    public string $createType = Conversation::TypeDirect;
+
+    public string $memberSearch = '';
+
+    /**
+     * @var array<int, int>
+     */
+    public array $selectedMemberIds = [];
+
+    public string $groupName = '';
+
+    public string $groupDescription = '';
+
     #[On('message-created')]
+    #[On('conversation-created')]
+    #[On('conversation-updated')]
     public function refreshConversations(): void
     {
         unset($this->conversations);
@@ -29,6 +50,136 @@ class ConversationList extends Component
     public function selectConversation(int $conversationId): void
     {
         $this->dispatch('conversation-selected', conversationId: $conversationId);
+    }
+
+    public function openCreateConversation(): void
+    {
+        $this->resetCreateConversationForm();
+
+        $this->showCreateConversationModal = true;
+    }
+
+    public function updatedCreateType(string $createType): void
+    {
+        if ($createType === Conversation::TypeDirect && count($this->selectedMemberIds) > 1) {
+            $this->selectedMemberIds = [array_values($this->selectedMemberIds)[0]];
+        }
+
+        $this->resetValidation();
+
+        unset($this->candidateUsers, $this->selectedMembers);
+    }
+
+    public function toggleMember(int $userId): void
+    {
+        if ($userId === Auth::id()) {
+            return;
+        }
+
+        if (! User::query()->whereKey($userId)->exists()) {
+            return;
+        }
+
+        if ($this->createType === Conversation::TypeDirect) {
+            $this->selectedMemberIds = [$userId];
+        } elseif (in_array($userId, $this->selectedMemberIds, true)) {
+            $this->selectedMemberIds = array_values(array_diff($this->selectedMemberIds, [$userId]));
+        } else {
+            $this->selectedMemberIds[] = $userId;
+        }
+
+        $this->resetValidation('selectedMemberIds');
+
+        unset($this->candidateUsers, $this->selectedMembers);
+    }
+
+    public function removeSelectedMember(int $userId): void
+    {
+        $this->selectedMemberIds = array_values(array_diff($this->selectedMemberIds, [$userId]));
+
+        unset($this->candidateUsers, $this->selectedMembers);
+    }
+
+    public function createConversation(): void
+    {
+        Gate::authorize('create', Conversation::class);
+
+        $validated = $this->validate([
+            'createType' => ['required', Rule::in([Conversation::TypeDirect, Conversation::TypeGroup])],
+            'selectedMemberIds' => ['required', 'array', 'min:1'],
+            'selectedMemberIds.*' => ['integer', Rule::exists('users', 'id')],
+            'groupName' => [
+                Rule::requiredIf($this->createType === Conversation::TypeGroup),
+                'nullable',
+                'string',
+                'max:80',
+            ],
+            'groupDescription' => ['nullable', 'string', 'max:180'],
+        ]);
+
+        $memberIds = User::query()
+            ->whereKey($validated['selectedMemberIds'])
+            ->whereKeyNot(Auth::id())
+            ->pluck('id')
+            ->map(fn (int $id) => $id)
+            ->values();
+
+        if ($memberIds->isEmpty()) {
+            $this->addError('selectedMemberIds', __('Choose at least one person.'));
+
+            return;
+        }
+
+        if ($this->createType === Conversation::TypeDirect && $memberIds->count() !== 1) {
+            $this->addError('selectedMemberIds', __('Choose one person for a direct conversation.'));
+
+            return;
+        }
+
+        $conversation = DB::transaction(function () use ($memberIds, $validated): Conversation {
+            if ($this->createType === Conversation::TypeDirect) {
+                $existingConversation = $this->findExistingDirectConversation($memberIds->first());
+
+                if ($existingConversation) {
+                    return $existingConversation;
+                }
+            }
+
+            $conversation = Conversation::query()->create([
+                'created_by_id' => Auth::id(),
+                'type' => $this->createType,
+                'name' => $this->createType === Conversation::TypeGroup ? trim((string) $validated['groupName']) : null,
+                'description' => $this->createType === Conversation::TypeGroup ? trim((string) ($validated['groupDescription'] ?? '')) ?: null : null,
+            ]);
+
+            ConversationParticipant::query()->create([
+                'conversation_id' => $conversation->id,
+                'user_id' => Auth::id(),
+                'role' => ConversationParticipant::RoleAdmin,
+                'joined_at' => now(),
+                'last_read_at' => now(),
+            ]);
+
+            $memberIds->each(fn (int $memberId) => ConversationParticipant::query()->create([
+                'conversation_id' => $conversation->id,
+                'user_id' => $memberId,
+                'role' => ConversationParticipant::RoleMember,
+                'joined_at' => now(),
+            ]));
+
+            return $conversation;
+        });
+
+        $this->resetCreateConversationForm();
+
+        $this->showCreateConversationModal = false;
+
+        unset($this->conversations);
+
+        Flux::toast(variant: 'success', text: __('Conversation ready.'));
+
+        $this->dispatch('conversation-created', conversationId: $conversation->id);
+        $this->dispatch('conversation-selected', conversationId: $conversation->id);
     }
 
     /**
@@ -77,6 +228,42 @@ class ConversationList extends Component
             ->orderByDesc('updated_at')
             ->limit(40)
             ->get();
+    }
+
+    /**
+     * @return Collection<int, User>
+     */
+    #[Computed]
+    public function candidateUsers(): Collection
+    {
+        $search = trim($this->memberSearch);
+
+        return User::query()
+            ->select(['id', 'name', 'email'])
+            ->whereKeyNot(Auth::id())
+            ->whereNotIn('id', $this->selectedMemberIds)
+            ->when($search !== '', fn (Builder $query) => $query->where(function (Builder $query) use ($search): void {
+                $query
+                    ->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            }))
+            ->orderBy('name')
+            ->limit(10)
+            ->get();
+    }
+
+    /**
+     * @return Collection<int, User>
+     */
+    #[Computed]
+    public function selectedMembers(): Collection
+    {
+        return User::query()
+            ->select(['id', 'name', 'email'])
+            ->whereKey($this->selectedMemberIds)
+            ->get()
+            ->sortBy(fn (User $user) => array_search($user->id, $this->selectedMemberIds, true))
+            ->values();
     }
 
     public function titleFor(Conversation $conversation): string
@@ -157,6 +344,32 @@ class ConversationList extends Component
         return $conversation->participants
             ->first(fn (ConversationParticipant $participant) => $participant->user_id !== Auth::id())
             ?->user;
+    }
+
+    private function findExistingDirectConversation(int $memberId): ?Conversation
+    {
+        return Conversation::query()
+            ->forUser(Auth::user())
+            ->where('type', Conversation::TypeDirect)
+            ->whereHas('participants', fn (Builder $participants) => $participants->where('user_id', $memberId))
+            ->withCount('participants')
+            ->get()
+            ->first(fn (Conversation $conversation) => (int) $conversation->participants_count === 2);
+    }
+
+    private function resetCreateConversationForm(): void
+    {
+        $this->reset(
+            'createType',
+            'memberSearch',
+            'selectedMemberIds',
+            'groupName',
+            'groupDescription',
+        );
+
+        $this->resetValidation();
+
+        unset($this->candidateUsers, $this->selectedMembers);
     }
 
     public function render(): View

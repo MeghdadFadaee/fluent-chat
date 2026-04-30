@@ -4,11 +4,18 @@ namespace App\Livewire\Chat;
 
 use App\Models\Conversation;
 use App\Models\ConversationParticipant;
+use App\Models\User;
+use Flux\Flux;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class ConversationDetailsPanel extends Component
@@ -16,9 +23,28 @@ class ConversationDetailsPanel extends Component
     #[Locked]
     public int $conversationId;
 
+    public bool $showAddMembersModal = false;
+
+    public string $memberSearch = '';
+
+    /**
+     * @var array<int, int>
+     */
+    public array $selectedMemberIds = [];
+
+    public string $groupName = '';
+
     public function mount(int $conversationId): void
     {
         $this->conversationId = $conversationId;
+    }
+
+    #[On('conversation-updated')]
+    public function refreshConversation(int $conversationId): void
+    {
+        if ($conversationId === $this->conversationId) {
+            unset($this->conversation);
+        }
     }
 
     #[Computed]
@@ -57,6 +83,183 @@ class ConversationDetailsPanel extends Component
             ->take(2)
             ->map(fn (string $word) => mb_substr($word, 0, 1))
             ->implode('');
+    }
+
+    public function canAddMembers(): bool
+    {
+        return Gate::allows('addMembers', $this->conversation);
+    }
+
+    public function closeDetails(): void
+    {
+        $this->dispatch('conversation-details-toggled');
+    }
+
+    public function openAddMembers(): void
+    {
+        Gate::authorize('addMembers', $this->conversation);
+
+        $this->resetAddMembersForm();
+        $this->groupName = $this->conversation->isGroup() ? '' : $this->suggestedGroupName();
+        $this->showAddMembersModal = true;
+    }
+
+    public function toggleMember(int $userId): void
+    {
+        if ($userId === Auth::id()) {
+            return;
+        }
+
+        if ($this->conversation->participants->contains('user_id', $userId)) {
+            return;
+        }
+
+        if (! User::query()->whereKey($userId)->exists()) {
+            return;
+        }
+
+        if (in_array($userId, $this->selectedMemberIds, true)) {
+            $this->selectedMemberIds = array_values(array_diff($this->selectedMemberIds, [$userId]));
+        } else {
+            $this->selectedMemberIds[] = $userId;
+        }
+
+        $this->resetValidation('selectedMemberIds');
+
+        unset($this->availableUsers, $this->selectedMembers);
+    }
+
+    public function removeSelectedMember(int $userId): void
+    {
+        $this->selectedMemberIds = array_values(array_diff($this->selectedMemberIds, [$userId]));
+
+        unset($this->availableUsers, $this->selectedMembers);
+    }
+
+    public function addMembers(): void
+    {
+        $conversation = $this->conversation;
+
+        Gate::authorize('addMembers', $conversation);
+
+        $validated = $this->validate([
+            'selectedMemberIds' => ['required', 'array', 'min:1'],
+            'selectedMemberIds.*' => ['integer', Rule::exists('users', 'id')],
+            'groupName' => ['nullable', 'string', 'max:80'],
+        ]);
+
+        $existingMemberIds = $conversation->participants->pluck('user_id');
+        $memberIds = User::query()
+            ->whereKey($validated['selectedMemberIds'])
+            ->whereKeyNot(Auth::id())
+            ->whereNotIn('id', $existingMemberIds)
+            ->pluck('id')
+            ->values();
+
+        if ($memberIds->isEmpty()) {
+            $this->addError('selectedMemberIds', __('Choose at least one new person.'));
+
+            return;
+        }
+
+        DB::transaction(function () use ($conversation, $memberIds): void {
+            if (! $conversation->isGroup()) {
+                $conversation->forceFill([
+                    'type' => Conversation::TypeGroup,
+                    'name' => trim($this->groupName) ?: $this->suggestedGroupName($memberIds),
+                ])->save();
+
+                ConversationParticipant::query()
+                    ->where('conversation_id', $conversation->id)
+                    ->where('user_id', Auth::id())
+                    ->update(['role' => ConversationParticipant::RoleAdmin]);
+            }
+
+            $memberIds->each(fn (int $memberId) => ConversationParticipant::query()->firstOrCreate([
+                'conversation_id' => $conversation->id,
+                'user_id' => $memberId,
+            ], [
+                'role' => ConversationParticipant::RoleMember,
+                'joined_at' => now(),
+            ]));
+
+            $conversation->touch();
+        });
+
+        $this->resetAddMembersForm();
+        $this->showAddMembersModal = false;
+
+        unset($this->conversation);
+
+        Flux::toast(variant: 'success', text: __('Members added.'));
+
+        $this->dispatch('conversation-updated', conversationId: $this->conversationId);
+    }
+
+    /**
+     * @return Collection<int, User>
+     */
+    #[Computed]
+    public function availableUsers(): Collection
+    {
+        $search = trim($this->memberSearch);
+        $participantIds = $this->conversation->participants->pluck('user_id')->all();
+
+        return User::query()
+            ->select(['id', 'name', 'email'])
+            ->whereNotIn('id', $participantIds)
+            ->whereNotIn('id', $this->selectedMemberIds)
+            ->when($search !== '', fn (Builder $query) => $query->where(function (Builder $query) use ($search): void {
+                $query
+                    ->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            }))
+            ->orderBy('name')
+            ->limit(10)
+            ->get();
+    }
+
+    /**
+     * @return Collection<int, User>
+     */
+    #[Computed]
+    public function selectedMembers(): Collection
+    {
+        return User::query()
+            ->select(['id', 'name', 'email'])
+            ->whereKey($this->selectedMemberIds)
+            ->get()
+            ->sortBy(fn (User $user) => array_search($user->id, $this->selectedMemberIds, true))
+            ->values();
+    }
+
+    private function suggestedGroupName(?Collection $newMemberIds = null): string
+    {
+        $participantNames = $this->conversation->participants
+            ->pluck('user.name')
+            ->filter();
+
+        if ($newMemberIds) {
+            $participantNames = $participantNames->merge(
+                User::query()
+                    ->whereKey($newMemberIds->all())
+                    ->orderBy('name')
+                    ->pluck('name')
+            );
+        }
+
+        return $participantNames
+            ->unique()
+            ->take(4)
+            ->join(', ');
+    }
+
+    private function resetAddMembersForm(): void
+    {
+        $this->reset('memberSearch', 'selectedMemberIds', 'groupName');
+        $this->resetValidation();
+
+        unset($this->availableUsers, $this->selectedMembers);
     }
 
     public function render(): View

@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class ConversationHeader extends Component
@@ -20,6 +21,14 @@ class ConversationHeader extends Component
     public function mount(int $conversationId): void
     {
         $this->conversationId = $conversationId;
+    }
+
+    #[On('conversation-updated')]
+    public function refreshConversation(int $conversationId): void
+    {
+        if ($conversationId === $this->conversationId) {
+            unset($this->conversation);
+        }
     }
 
     #[Computed]

@@ -41,10 +41,19 @@
     </main>
 
     @if ($selectedConversationId && $detailsPanelOpen)
-        <aside class="hidden h-full w-[21rem] shrink-0 border-s border-zinc-200 bg-zinc-50/70 dark:border-zinc-800 dark:bg-zinc-900/60 2xl:flex">
+        <aside class="hidden h-full w-[21rem] shrink-0 border-s border-zinc-200 bg-zinc-50/70 dark:border-zinc-800 dark:bg-zinc-900/60 xl:flex">
             <livewire:chat.conversation-details-panel
                 :conversation-id="$selectedConversationId"
-                :key="'conversation-details-'.$selectedConversationId"
+                :key="'conversation-details-desktop-'.$selectedConversationId"
+            />
+        </aside>
+
+        <div class="fixed inset-0 z-40 bg-zinc-950/40 backdrop-blur-[2px] xl:hidden" wire:click="toggleDetailsPanel"></div>
+
+        <aside class="fixed inset-y-0 end-0 z-50 flex w-full max-w-sm border-s border-zinc-200 bg-zinc-50 shadow-xl dark:border-zinc-800 dark:bg-zinc-900 xl:hidden">
+            <livewire:chat.conversation-details-panel
+                :conversation-id="$selectedConversationId"
+                :key="'conversation-details-mobile-'.$selectedConversationId"
             />
         </aside>
     @endif
