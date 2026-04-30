@@ -51,6 +51,7 @@ test('conversation list only shows conversations the user participates in', func
 
     Livewire::test(ConversationList::class)
         ->assertSee('Visible Teammate')
+        ->assertSee('Opening')
         ->assertDontSee('Hidden Teammate');
 });
 

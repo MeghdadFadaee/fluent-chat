@@ -99,13 +99,27 @@
                     type="button"
                     wire:key="conversation-{{ $conversation->id }}"
                     wire:click="selectConversation({{ $conversation->id }})"
+                    wire:loading.attr="disabled"
+                    wire:target="selectConversation({{ $conversation->id }})"
                     aria-pressed="{{ $selected ? 'true' : 'false' }}"
                     @class([
-                        'group grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg border p-3 text-left transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-zinc-950',
+                        'group relative grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg border p-3 text-left transition duration-150 data-loading:cursor-wait data-loading:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:pointer-events-none dark:focus-visible:ring-offset-zinc-950',
                         'border-zinc-900 bg-zinc-900 text-white shadow-sm dark:border-white dark:bg-white dark:text-zinc-950' => $selected,
                         'border-transparent hover:border-zinc-200 hover:bg-white hover:shadow-sm dark:hover:border-zinc-800 dark:hover:bg-zinc-900' => ! $selected,
                     ])
                 >
+                    <div
+                        wire:loading.flex
+                        wire:target="selectConversation({{ $conversation->id }})"
+                        class="absolute inset-0 z-10 hidden items-center justify-center rounded-lg bg-white/70 backdrop-blur-[2px] dark:bg-zinc-950/70"
+                        aria-hidden="true"
+                    >
+                        <div class="flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+                            <flux:icon.loading class="size-4" />
+                            <span>{{ __('Opening') }}</span>
+                        </div>
+                    </div>
+
                     <div class="relative">
                         @if ($conversation->isGroup())
                             <div @class([
