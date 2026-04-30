@@ -199,7 +199,7 @@ class ConversationList extends Component
                     ->select(['id', 'conversation_id', 'user_id', 'role', 'last_read_at'])
                     ->with('user:id,name,email'),
                 'latestMessage' => fn ($query) => $query
-                    ->select(['messages.id', 'messages.conversation_id', 'messages.user_id', 'messages.body', 'messages.created_at']),
+                    ->select(['messages.id', 'messages.conversation_id', 'messages.user_id', 'messages.type', 'messages.body', 'messages.metadata', 'messages.created_at']),
                 'latestMessage.sender:id,name,email',
             ])
             ->withMax('messages', 'created_at')
@@ -298,7 +298,11 @@ class ConversationList extends Component
             ? __('You: ')
             : ($conversation->isGroup() ? $conversation->latestMessage->sender?->name.': ' : '');
 
-        return str($prefix.$conversation->latestMessage->body)
+        $preview = $conversation->latestMessage->isFile()
+            ? __('Sent a file: :name', ['name' => $conversation->latestMessage->attachmentName()])
+            : $conversation->latestMessage->body;
+
+        return str($prefix.$preview)
             ->squish()
             ->limit(86)
             ->toString();

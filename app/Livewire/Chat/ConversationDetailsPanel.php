@@ -4,6 +4,7 @@ namespace App\Livewire\Chat;
 
 use App\Models\Conversation;
 use App\Models\ConversationParticipant;
+use App\Models\Message;
 use App\Models\User;
 use Flux\Flux;
 use Illuminate\Contracts\View\View;
@@ -24,6 +25,8 @@ class ConversationDetailsPanel extends Component
     public int $conversationId;
 
     public bool $showAddMembersModal = false;
+
+    public bool $showFilesModal = false;
 
     public string $memberSearch = '';
 
@@ -47,6 +50,14 @@ class ConversationDetailsPanel extends Component
         }
     }
 
+    #[On('message-created')]
+    public function refreshFiles(int $conversationId): void
+    {
+        if ($conversationId === $this->conversationId) {
+            unset($this->conversation, $this->files);
+        }
+    }
+
     #[Computed]
     public function conversation(): Conversation
     {
@@ -57,7 +68,10 @@ class ConversationDetailsPanel extends Component
                     ->select(['id', 'conversation_id', 'user_id', 'role', 'joined_at'])
                     ->with('user:id,name,email'),
             ])
-            ->withCount('messages')
+            ->withCount([
+                'messages',
+                'messages as files_count' => fn (Builder $messages) => $messages->where('type', Message::TypeFile),
+            ])
             ->findOrFail($this->conversationId);
 
         Gate::authorize('view', $conversation);
@@ -102,6 +116,15 @@ class ConversationDetailsPanel extends Component
         $this->resetAddMembersForm();
         $this->groupName = $this->conversation->isGroup() ? '' : $this->suggestedGroupName();
         $this->showAddMembersModal = true;
+    }
+
+    public function openFiles(): void
+    {
+        Gate::authorize('view', $this->conversation);
+
+        unset($this->files);
+
+        $this->showFilesModal = true;
     }
 
     public function toggleMember(int $userId): void
@@ -231,6 +254,23 @@ class ConversationDetailsPanel extends Component
             ->get()
             ->sortBy(fn (User $user) => array_search($user->id, $this->selectedMemberIds, true))
             ->values();
+    }
+
+    /**
+     * @return Collection<int, Message>
+     */
+    #[Computed]
+    public function files(): Collection
+    {
+        Gate::authorize('view', $this->conversation);
+
+        return Message::query()
+            ->where('conversation_id', $this->conversationId)
+            ->where('type', Message::TypeFile)
+            ->with('sender:id,name,email')
+            ->latest()
+            ->limit(50)
+            ->get();
     }
 
     private function suggestedGroupName(?Collection $newMemberIds = null): string

@@ -97,7 +97,43 @@
                                 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950' => $isMine,
                                 'border border-zinc-200 bg-white text-zinc-800 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100' => ! $isMine,
                             ])>
-                                <p class="whitespace-pre-wrap break-words">{{ $message->body }}</p>
+                                @if ($message->isFile())
+                                    <a
+                                        href="{{ route('messages.attachment.download', $message) }}"
+                                        @class([
+                                            'group flex min-w-0 items-center gap-3 rounded-md border p-3 text-left transition',
+                                            'border-white/15 bg-white/10 hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 dark:border-zinc-950/10 dark:bg-zinc-950/5 dark:hover:bg-zinc-950/10 dark:focus-visible:ring-zinc-950/40' => $isMine,
+                                            'border-zinc-200 bg-zinc-50 hover:bg-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:border-zinc-700 dark:bg-zinc-950 dark:hover:bg-zinc-800' => ! $isMine,
+                                        ])
+                                    >
+                                        <span @class([
+                                            'flex size-10 shrink-0 items-center justify-center rounded-md',
+                                            'bg-white/15 text-white dark:bg-zinc-950/10 dark:text-zinc-800' => $isMine,
+                                            'bg-white text-zinc-500 shadow-sm dark:bg-zinc-900 dark:text-zinc-300' => ! $isMine,
+                                        ])>
+                                            <flux:icon.document class="size-5" />
+                                        </span>
+
+                                        <span class="min-w-0 flex-1">
+                                            <span class="block truncate font-medium">{{ $message->attachmentName() }}</span>
+                                            <span @class([
+                                                'mt-0.5 block text-xs',
+                                                'text-white/70 dark:text-zinc-600' => $isMine,
+                                                'text-zinc-500 dark:text-zinc-400' => ! $isMine,
+                                            ])>
+                                                {{ $message->formattedAttachmentSize() }}
+                                            </span>
+                                        </span>
+
+                                        <flux:icon.arrow-down-tray @class([
+                                            'size-4 shrink-0 transition group-hover:translate-y-0.5',
+                                            'text-white/70 dark:text-zinc-600' => $isMine,
+                                            'text-zinc-400 dark:text-zinc-500' => ! $isMine,
+                                        ]) />
+                                    </a>
+                                @else
+                                    <p class="whitespace-pre-wrap break-words">{{ $message->body }}</p>
+                                @endif
                             </div>
 
                             <div @class([

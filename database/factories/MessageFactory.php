@@ -35,4 +35,25 @@ class MessageFactory extends Factory
             'edited_at' => null,
         ];
     }
+
+    public function file(array $metadata = []): static
+    {
+        $name = $metadata['original_name'] ?? fake()->randomElement([
+            'project-brief.pdf',
+            'launch-notes.txt',
+            'design-review.png',
+        ]);
+
+        return $this->state(fn (array $attributes) => [
+            'type' => Message::TypeFile,
+            'body' => $name,
+            'metadata' => array_merge([
+                'disk' => 'local',
+                'path' => 'chat-attachments/'.fake()->uuid().'/'.$name,
+                'original_name' => $name,
+                'mime_type' => 'application/octet-stream',
+                'size' => fake()->numberBetween(24_000, 2_400_000),
+            ], $metadata),
+        ]);
+    }
 }

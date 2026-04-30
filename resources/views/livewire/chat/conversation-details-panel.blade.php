@@ -52,7 +52,24 @@
                 </flux:tooltip>
 
                 <flux:tooltip :content="__('Files')" position="top">
-                    <flux:button type="button" variant="filled" icon="folder" aria-label="{{ __('Files') }}" />
+                    <div class="relative">
+                        <flux:button
+                            type="button"
+                            variant="filled"
+                            icon="folder"
+                            wire:click="openFiles"
+                            wire:loading.attr="disabled"
+                            wire:target="openFiles"
+                            aria-label="{{ __('Files') }}"
+                            class="w-full"
+                        />
+
+                        @if ((int) $this->conversation->files_count > 0)
+                            <span class="absolute -end-1 -top-1 flex min-w-5 items-center justify-center rounded-full bg-zinc-900 px-1 text-[10px] font-semibold text-white shadow-sm dark:bg-white dark:text-zinc-950">
+                                {{ $this->conversation->files_count }}
+                            </span>
+                        @endif
+                    </div>
                 </flux:tooltip>
             </div>
         </section>
@@ -119,6 +136,11 @@
                 <div class="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950">
                     <div class="text-xs text-zinc-500 dark:text-zinc-400">{{ __('Messages') }}</div>
                     <div class="mt-1 font-semibold text-zinc-900 dark:text-zinc-100">{{ $this->conversation->messages_count }}</div>
+                </div>
+
+                <div class="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950">
+                    <div class="text-xs text-zinc-500 dark:text-zinc-400">{{ __('Files') }}</div>
+                    <div class="mt-1 font-semibold text-zinc-900 dark:text-zinc-100">{{ $this->conversation->files_count }}</div>
                 </div>
             </div>
         </section>
@@ -234,5 +256,71 @@
                 </flux:button>
             </div>
         </form>
+    </flux:modal>
+
+    <flux:modal wire:model="showFilesModal" class="w-full max-w-2xl">
+        <div class="space-y-6">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <flux:heading size="lg">{{ __('Conversation files') }}</flux:heading>
+                    <flux:text class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                        {{ __('Recent files shared in this conversation.') }}
+                    </flux:text>
+                </div>
+
+                <flux:badge color="zinc">
+                    {{ trans_choice(':count file|:count files', $this->conversation->files_count, ['count' => $this->conversation->files_count]) }}
+                </flux:badge>
+            </div>
+
+            <div class="max-h-[30rem] overflow-y-auto rounded-lg border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-800 dark:bg-zinc-950">
+                @forelse ($this->files as $file)
+                    <a
+                        wire:key="details-file-{{ $file->id }}"
+                        href="{{ route('messages.attachment.download', $file) }}"
+                        class="group flex items-center gap-3 rounded-md p-3 text-left transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:hover:bg-zinc-900"
+                    >
+                        <span class="flex size-11 shrink-0 items-center justify-center rounded-lg bg-white text-zinc-500 shadow-sm ring-1 ring-zinc-200 dark:bg-zinc-900 dark:text-zinc-300 dark:ring-zinc-800">
+                            <flux:icon.document class="size-5" />
+                        </span>
+
+                        <span class="min-w-0 flex-1">
+                            <span class="block truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                {{ $file->attachmentName() }}
+                            </span>
+                            <span class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
+                                <span>{{ $file->formattedAttachmentSize() }}</span>
+                                <span aria-hidden="true">&middot;</span>
+                                <span>{{ $file->sender?->name ?? __('Deleted user') }}</span>
+                                <span aria-hidden="true">&middot;</span>
+                                <span>{{ $file->created_at->format('M j, H:i') }}</span>
+                            </span>
+                        </span>
+
+                        <span class="flex size-9 shrink-0 items-center justify-center rounded-full text-zinc-400 transition group-hover:bg-zinc-100 group-hover:text-zinc-700 dark:text-zinc-500 dark:group-hover:bg-zinc-800 dark:group-hover:text-zinc-200">
+                            <flux:icon.arrow-down-tray class="size-4" />
+                        </span>
+                    </a>
+                @empty
+                    <div class="flex min-h-56 items-center justify-center p-8 text-center">
+                        <div class="max-w-xs">
+                            <div class="mx-auto mb-4 flex size-12 items-center justify-center rounded-lg border border-dashed border-zinc-300 text-zinc-400 dark:border-zinc-700">
+                                <flux:icon.folder-open class="size-6" />
+                            </div>
+                            <flux:heading size="sm">{{ __('No files shared yet') }}</flux:heading>
+                            <flux:text class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                                {{ __('Files you send in the composer will appear here for quick access.') }}
+                            </flux:text>
+                        </div>
+                    </div>
+                @endforelse
+            </div>
+
+            <div class="flex justify-end border-t border-zinc-200 pt-4 dark:border-zinc-800">
+                <flux:modal.close>
+                    <flux:button type="button" variant="ghost">{{ __('Close') }}</flux:button>
+                </flux:modal.close>
+            </div>
+        </div>
     </flux:modal>
 </aside>

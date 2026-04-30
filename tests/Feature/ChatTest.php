@@ -10,6 +10,8 @@ use App\Models\ConversationParticipant;
 use App\Models\Message;
 use App\Models\User;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 uses(LazilyRefreshDatabase::class);
@@ -122,6 +124,145 @@ test('participants can send messages', function () {
         ->where('user_id', $user->id)
         ->where('body', 'This looks ready to ship.')
         ->exists())->toBeTrue();
+});
+
+test('participants can send file messages', function () {
+    Storage::fake('local');
+
+    $user = User::factory()->create();
+    $conversation = Conversation::factory()
+        ->direct()
+        ->for($user, 'creator')
+        ->create();
+
+    ConversationParticipant::factory()->for($conversation)->for($user)->create();
+
+    $this->actingAs($user);
+
+    Livewire::test(MessageComposer::class, ['conversationId' => $conversation->id])
+        ->set('attachments', [
+            UploadedFile::fake()->create('handoff.pdf', 64, 'application/pdf'),
+        ])
+        ->call('sendMessage')
+        ->assertHasNoErrors()
+        ->assertSet('body', '')
+        ->assertSet('attachments', []);
+
+    $message = Message::query()
+        ->where('conversation_id', $conversation->id)
+        ->where('user_id', $user->id)
+        ->where('type', Message::TypeFile)
+        ->first();
+
+    expect($message)->not->toBeNull();
+    expect($message->attachmentName())->toBe('handoff.pdf');
+
+    Storage::disk('local')->assertExists($message->attachmentPath());
+});
+
+test('file metadata is captured before temporary uploads are moved', function () {
+    Storage::fake('local');
+
+    $user = User::factory()->create();
+    $conversation = Conversation::factory()
+        ->direct()
+        ->for($user, 'creator')
+        ->create();
+
+    ConversationParticipant::factory()->for($conversation)->for($user)->create();
+
+    $this->actingAs($user);
+
+    $originalEnvironment = app()->environment();
+    $content = str_repeat('x', 131072);
+
+    try {
+        app()->instance('env', 'local');
+
+        Livewire::test(MessageComposer::class, ['conversationId' => $conversation->id])
+            ->set('attachments', [
+                UploadedFile::fake()->createWithContent('screenshot.txt', $content),
+            ])
+            ->call('sendMessage')
+            ->assertHasNoErrors();
+    } finally {
+        app()->instance('env', $originalEnvironment);
+    }
+
+    $message = Message::query()
+        ->where('conversation_id', $conversation->id)
+        ->where('type', Message::TypeFile)
+        ->first();
+
+    expect($message)->not->toBeNull();
+    expect($message->metadata)
+        ->toMatchArray([
+            'original_name' => 'screenshot.txt',
+            'size' => 131072,
+        ]);
+});
+
+test('participants can download shared files', function () {
+    Storage::fake('local');
+
+    $user = User::factory()->create();
+    $outsider = User::factory()->create();
+    $conversation = Conversation::factory()
+        ->direct()
+        ->for($user, 'creator')
+        ->create();
+
+    ConversationParticipant::factory()->for($conversation)->for($user)->create();
+
+    Storage::disk('local')->put('chat-attachments/'.$conversation->id.'/handoff.pdf', 'file contents');
+
+    $message = Message::factory()
+        ->file([
+            'path' => 'chat-attachments/'.$conversation->id.'/handoff.pdf',
+            'original_name' => 'handoff.pdf',
+            'mime_type' => 'application/pdf',
+            'size' => 13,
+        ])
+        ->for($conversation)
+        ->for($user, 'sender')
+        ->create();
+
+    $this->actingAs($user)
+        ->get(route('messages.attachment.download', $message))
+        ->assertOk()
+        ->assertDownload('handoff.pdf');
+
+    $this->actingAs($outsider)
+        ->get(route('messages.attachment.download', $message))
+        ->assertForbidden();
+});
+
+test('conversation details files action shows shared files', function () {
+    $user = User::factory()->create();
+    $conversation = Conversation::factory()
+        ->direct()
+        ->for($user, 'creator')
+        ->create();
+
+    ConversationParticipant::factory()->for($conversation)->for($user)->create();
+
+    Message::factory()
+        ->file([
+            'original_name' => 'launch-plan.pdf',
+            'path' => 'chat-attachments/'.$conversation->id.'/launch-plan.pdf',
+            'size' => 42000,
+        ])
+        ->for($conversation)
+        ->for($user, 'sender')
+        ->create();
+
+    $this->actingAs($user);
+
+    Livewire::test(ConversationDetailsPanel::class, ['conversationId' => $conversation->id])
+        ->call('openFiles')
+        ->assertSet('showFilesModal', true)
+        ->assertSee('launch-plan.pdf')
+        ->assertSee('Conversation files');
 });
 
 test('participants can add people to a direct conversation', function () {
