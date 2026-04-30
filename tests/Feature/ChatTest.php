@@ -21,6 +21,8 @@ test('authenticated users can visit the chat dashboard', function () {
         ->get(route('dashboard'))
         ->assertOk()
         ->assertSee('Inbox')
+        ->assertSee('Profile settings')
+        ->assertSee('Password and 2FA')
         ->assertDontSee('Repository')
         ->assertDontSee('Documentation');
 });

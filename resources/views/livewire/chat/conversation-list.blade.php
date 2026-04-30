@@ -8,7 +8,63 @@
                 </flux:text>
             </div>
 
-            <flux:badge color="emerald" size="sm">{{ __('Live') }}</flux:badge>
+            <div class="flex items-center gap-2">
+                <flux:badge color="emerald" size="sm">{{ __('Live') }}</flux:badge>
+
+                <flux:dropdown position="bottom" align="end">
+                    <flux:profile
+                        :name="auth()->user()->name"
+                        :initials="auth()->user()->initials()"
+                        icon-trailing="chevron-down"
+                        aria-label="{{ __('Account menu') }}"
+                    />
+
+                    <flux:menu>
+                        <div class="p-2">
+                            <div class="flex items-center gap-3 rounded-lg bg-zinc-50 p-2 dark:bg-zinc-900">
+                                <flux:avatar
+                                    circle
+                                    :name="auth()->user()->name"
+                                    :initials="auth()->user()->initials()"
+                                />
+
+                                <div class="min-w-0">
+                                    <div class="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ auth()->user()->name }}</div>
+                                    <div class="truncate text-xs text-zinc-500 dark:text-zinc-400">{{ auth()->user()->email }}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <flux:menu.separator />
+
+                        <flux:menu.item :href="route('profile.edit')" icon="user-circle" wire:navigate>
+                            {{ __('Profile settings') }}
+                        </flux:menu.item>
+
+                        <flux:menu.item :href="route('security.edit')" icon="shield-check" wire:navigate>
+                            {{ __('Password and 2FA') }}
+                        </flux:menu.item>
+
+                        <flux:menu.item :href="route('appearance.edit')" icon="swatch" wire:navigate>
+                            {{ __('Appearance') }}
+                        </flux:menu.item>
+
+                        <flux:menu.separator />
+
+                        <form method="POST" action="{{ route('logout') }}" class="w-full">
+                            @csrf
+                            <flux:menu.item
+                                as="button"
+                                type="submit"
+                                icon="arrow-right-start-on-rectangle"
+                                class="w-full cursor-pointer"
+                            >
+                                {{ __('Log out') }}
+                            </flux:menu.item>
+                        </form>
+                    </flux:menu>
+                </flux:dropdown>
+            </div>
         </div>
 
         <flux:input
