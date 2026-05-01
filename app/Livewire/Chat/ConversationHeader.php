@@ -98,6 +98,11 @@ class ConversationHeader extends Component
         $this->dispatch('conversation-details-toggled');
     }
 
+    public function toggleSearch(): void
+    {
+        $this->dispatch('conversation-search-toggled', conversationId: $this->conversationId);
+    }
+
     private function otherParticipant(): ?User
     {
         return $this->conversation->participants

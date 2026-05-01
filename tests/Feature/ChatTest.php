@@ -318,6 +318,60 @@ test('selected conversations render the stream header and details', function () 
         ->assertSee('Mina Partner');
 });
 
+test('conversation header search button opens message search', function () {
+    $user = User::factory()->create();
+    $teammate = User::factory()->create(['name' => 'Mina Partner']);
+    $conversation = Conversation::factory()
+        ->direct()
+        ->for($user, 'creator')
+        ->create();
+
+    ConversationParticipant::factory()->for($conversation)->for($user)->create();
+    ConversationParticipant::factory()->for($conversation)->for($teammate)->create();
+
+    $this->actingAs($user);
+
+    Livewire::test(ConversationHeader::class, ['conversationId' => $conversation->id])
+        ->call('toggleSearch')
+        ->assertDispatched('conversation-search-toggled');
+
+    Livewire::test(ConversationView::class, ['conversationId' => $conversation->id])
+        ->dispatch('conversation-search-toggled', conversationId: $conversation->id)
+        ->assertSet('messageSearchOpen', true)
+        ->assertSee('Search this conversation');
+});
+
+test('message search filters the selected conversation', function () {
+    $user = User::factory()->create();
+    $teammate = User::factory()->create();
+    $conversation = Conversation::factory()
+        ->direct()
+        ->for($user, 'creator')
+        ->create();
+
+    ConversationParticipant::factory()->for($conversation)->for($user)->create();
+    ConversationParticipant::factory()->for($conversation)->for($teammate)->create();
+
+    Message::factory()
+        ->for($conversation)
+        ->for($teammate, 'sender')
+        ->create(['body' => 'The deployment checklist is ready.']);
+
+    Message::factory()
+        ->for($conversation)
+        ->for($teammate, 'sender')
+        ->create(['body' => 'Budget review moved to Tuesday.']);
+
+    $this->actingAs($user);
+
+    Livewire::test(ConversationView::class, ['conversationId' => $conversation->id])
+        ->dispatch('conversation-search-toggled', conversationId: $conversation->id)
+        ->set('messageSearch', 'deployment')
+        ->assertSee('1 matching message')
+        ->assertSee('deployment')
+        ->assertDontSee('Budget review moved to Tuesday.');
+});
+
 test('empty messages are rejected', function () {
     $user = User::factory()->create();
     $conversation = Conversation::factory()

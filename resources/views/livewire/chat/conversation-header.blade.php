@@ -45,7 +45,13 @@
 
     <div class="flex items-center gap-1">
         <flux:tooltip :content="__('Search messages')" position="bottom">
-            <flux:button type="button" variant="ghost" icon="magnifying-glass" aria-label="{{ __('Search messages') }}" />
+            <flux:button
+                type="button"
+                variant="ghost"
+                icon="magnifying-glass"
+                wire:click="toggleSearch"
+                aria-label="{{ __('Search messages') }}"
+            />
         </flux:tooltip>
 
         <flux:tooltip :content="__('Conversation details')" position="bottom">

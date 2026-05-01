@@ -7,9 +7,11 @@ use App\Models\ConversationParticipant;
 use App\Models\Message;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\HtmlString;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -19,6 +21,10 @@ class ConversationView extends Component
     public int $conversationId;
 
     public int $messageLimit = 40;
+
+    public bool $messageSearchOpen = false;
+
+    public string $messageSearch = '';
 
     public function mount(int $conversationId): void
     {
@@ -31,6 +37,42 @@ class ConversationView extends Component
     public function loadEarlier(): void
     {
         $this->messageLimit += 25;
+    }
+
+    #[On('conversation-search-toggled')]
+    public function toggleMessageSearch(int $conversationId): void
+    {
+        if ($conversationId !== $this->conversationId) {
+            return;
+        }
+
+        $this->messageSearchOpen = ! $this->messageSearchOpen;
+
+        if (! $this->messageSearchOpen) {
+            $this->clearMessageSearch();
+        }
+    }
+
+    public function updatedMessageSearch(): void
+    {
+        $this->messageLimit = 40;
+
+        unset($this->messages, $this->hasMoreMessages, $this->searchResultsCount);
+    }
+
+    public function clearMessageSearch(): void
+    {
+        $this->messageSearch = '';
+        $this->messageLimit = 40;
+
+        unset($this->messages, $this->hasMoreMessages, $this->searchResultsCount);
+    }
+
+    public function closeMessageSearch(): void
+    {
+        $this->messageSearchOpen = false;
+
+        $this->clearMessageSearch();
     }
 
     #[On('message-created')]
@@ -76,8 +118,7 @@ class ConversationView extends Component
     #[Computed]
     public function messages(): Collection
     {
-        return Message::query()
-            ->where('conversation_id', $this->conversationId)
+        return $this->messageQuery()
             ->with('sender:id,name,email')
             ->latest()
             ->limit($this->messageLimit)
@@ -89,9 +130,18 @@ class ConversationView extends Component
     #[Computed]
     public function hasMoreMessages(): bool
     {
-        return Message::query()
-            ->where('conversation_id', $this->conversationId)
+        return $this->messageQuery()
             ->count() > $this->messageLimit;
+    }
+
+    #[Computed]
+    public function searchResultsCount(): int
+    {
+        if (! $this->messageSearchIsActive()) {
+            return 0;
+        }
+
+        return $this->messageQuery()->count();
     }
 
     public function dateLabel(CarbonInterface $timestamp): string
@@ -105,6 +155,30 @@ class ConversationView extends Component
         }
 
         return $timestamp->format('F j, Y');
+    }
+
+    public function messageSearchIsActive(): bool
+    {
+        return $this->messageSearchOpen && trim($this->messageSearch) !== '';
+    }
+
+    public function highlightedText(string $text): HtmlString
+    {
+        $escapedText = e($text);
+        $search = trim($this->messageSearch);
+
+        if (! $this->messageSearchIsActive() || $search === '') {
+            return new HtmlString($escapedText);
+        }
+
+        $escapedSearch = e($search);
+        $highlighted = preg_replace(
+            '/('.preg_quote($escapedSearch, '/').')/iu',
+            '<mark class="rounded bg-amber-200 px-0.5 text-zinc-950">$1</mark>',
+            $escapedText,
+        );
+
+        return new HtmlString($highlighted ?? $escapedText);
     }
 
     private function authorizeConversation(): void
@@ -122,6 +196,24 @@ class ConversationView extends Component
             ->where('conversation_id', $this->conversationId)
             ->where('user_id', Auth::id())
             ->update(['last_read_at' => now()]);
+    }
+
+    /**
+     * @return Builder<Message>
+     */
+    private function messageQuery(): Builder
+    {
+        $search = trim($this->messageSearch);
+
+        return Message::query()
+            ->where('conversation_id', $this->conversationId)
+            ->when($this->messageSearchIsActive(), fn (Builder $query) => $query->where(function (Builder $query) use ($search): void {
+                $query
+                    ->where('body', 'like', "%{$search}%")
+                    ->orWhereHas('sender', fn (Builder $sender) => $sender
+                        ->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%"));
+            }));
     }
 
     public function render(): View

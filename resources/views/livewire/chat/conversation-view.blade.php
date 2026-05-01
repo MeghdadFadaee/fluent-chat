@@ -15,6 +15,57 @@
         :key="'conversation-header-'.$conversationId"
     />
 
+    @if ($messageSearchOpen)
+        <section class="shrink-0 border-b border-zinc-200 bg-white/95 p-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95 sm:px-5">
+            <div class="flex items-center gap-2">
+                <flux:input
+                    wire:model.live.debounce.250ms="messageSearch"
+                    icon="magnifying-glass"
+                    :placeholder="__('Search this conversation')"
+                    aria-label="{{ __('Search this conversation') }}"
+                    class="flex-1"
+                />
+
+                @if ($messageSearch !== '')
+                    <flux:tooltip :content="__('Clear search')" position="bottom">
+                        <flux:button
+                            type="button"
+                            variant="ghost"
+                            icon="x-mark"
+                            wire:click="clearMessageSearch"
+                            aria-label="{{ __('Clear search') }}"
+                        />
+                    </flux:tooltip>
+                @endif
+
+                <flux:tooltip :content="__('Close search')" position="bottom">
+                    <flux:button
+                        type="button"
+                        variant="ghost"
+                        icon="chevron-up"
+                        wire:click="closeMessageSearch"
+                        aria-label="{{ __('Close search') }}"
+                    />
+                </flux:tooltip>
+            </div>
+
+            <div class="mt-2 flex min-h-5 items-center justify-between gap-3">
+                <flux:text class="text-xs text-zinc-500 dark:text-zinc-400">
+                    @if ($this->messageSearchIsActive())
+                        {{ trans_choice(':count matching message|:count matching messages', $this->searchResultsCount, ['count' => $this->searchResultsCount]) }}
+                    @else
+                        {{ __('Search by message text, file name, sender, or email.') }}
+                    @endif
+                </flux:text>
+
+                <div wire:loading.flex wire:target="messageSearch" class="items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+                    <flux:icon.arrow-path class="size-3.5 animate-spin" />
+                    <span>{{ __('Searching') }}</span>
+                </div>
+            </div>
+        </section>
+    @endif
+
     <div x-ref="messages" class="min-h-0 flex-1 overflow-y-auto scroll-smooth bg-zinc-50/40 px-4 py-6 dark:bg-zinc-950 sm:px-6">
         @if ($this->hasMoreMessages)
             <div class="mb-6 flex justify-center">
@@ -26,7 +77,7 @@
                     wire:loading.attr="disabled"
                     wire:target="loadEarlier"
                 >
-                    {{ __('Load earlier') }}
+                    {{ $this->messageSearchIsActive() ? __('Load more results') : __('Load earlier') }}
                 </flux:button>
             </div>
         @endif
@@ -37,9 +88,17 @@
                     <div class="mx-auto mb-4 flex size-12 items-center justify-center rounded-lg border border-dashed border-zinc-300 text-zinc-400 dark:border-zinc-700">
                         <flux:icon.chat-bubble-left-ellipsis class="size-6" />
                     </div>
-                    <flux:heading size="sm">{{ __('No messages yet') }}</flux:heading>
+
+                    <flux:heading size="sm">
+                        {{ $this->messageSearchIsActive() ? __('No matching messages') : __('No messages yet') }}
+                    </flux:heading>
+
                     <flux:text class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-                        {{ __('Start the conversation with a short note.') }}
+                        @if ($this->messageSearchIsActive())
+                            {{ __('No messages match your current search.') }}
+                        @else
+                            {{ __('Start the conversation with a short note.') }}
+                        @endif
                     </flux:text>
                 </div>
             </div>
@@ -115,7 +174,7 @@
                                         </span>
 
                                         <span class="min-w-0 flex-1">
-                                            <span class="block truncate font-medium">{{ $message->attachmentName() }}</span>
+                                            <span class="block truncate font-medium">{!! $this->highlightedText($message->attachmentName()) !!}</span>
                                             <span @class([
                                                 'mt-0.5 block text-xs',
                                                 'text-white/70 dark:text-zinc-600' => $isMine,
@@ -132,7 +191,7 @@
                                         ]) />
                                     </a>
                                 @else
-                                    <p class="whitespace-pre-wrap break-words">{{ $message->body }}</p>
+                                    <p class="whitespace-pre-wrap break-words">{!! $this->highlightedText($message->body) !!}</p>
                                 @endif
                             </div>
 
