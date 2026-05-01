@@ -1,11 +1,13 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/livewire-starter-kit",
+    "name": "meghdadfadaee/fluent-chat",
     "type": "project",
-    "description": "The official Laravel starter kit for Livewire.",
+    "description": "Fluent chat project with laravel and Flux.",
     "keywords": [
         "laravel",
-        "framework"
+        "framework",
+        "chat",
+        "flux"
     ],
     "license": "MIT",
     "require": {
