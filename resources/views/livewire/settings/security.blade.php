@@ -78,6 +78,7 @@
             <flux:modal
                 name="two-factor-setup-modal"
                 class="max-w-md md:min-w-md"
+                :closable="false"
                 @close="closeModal"
                 wire:model="showModal"
             >

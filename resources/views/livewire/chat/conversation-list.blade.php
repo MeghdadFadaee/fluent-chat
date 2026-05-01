@@ -215,7 +215,7 @@
         </flux:dropdown>
     </div>
 
-    <flux:modal wire:model="showCreateConversationModal" class="w-full max-w-2xl">
+    <flux:modal wire:model="showCreateConversationModal" :closable="false" class="w-full max-w-2xl">
         <form wire:submit="createConversation" class="space-y-6">
             <div class="flex items-start justify-between gap-4">
                 <div>

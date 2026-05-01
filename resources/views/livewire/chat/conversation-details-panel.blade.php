@@ -146,7 +146,7 @@
         </section>
     </div>
 
-    <flux:modal wire:model="showAddMembersModal" class="w-full max-w-xl">
+    <flux:modal wire:model="showAddMembersModal" :closable="false" class="w-full max-w-xl">
         <form wire:submit="addMembers" class="space-y-6">
             <div>
                 <flux:heading size="lg">{{ __('Add people') }}</flux:heading>
@@ -258,7 +258,7 @@
         </form>
     </flux:modal>
 
-    <flux:modal wire:model="showFilesModal" class="w-full max-w-2xl">
+    <flux:modal wire:model="showFilesModal" :closable="false" class="w-full max-w-2xl">
         <div class="space-y-6">
             <div class="flex items-start justify-between gap-4">
                 <div>
