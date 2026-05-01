@@ -15,7 +15,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->configureFileUploads();
     }
 
     /**
@@ -46,5 +46,15 @@ class AppServiceProvider extends ServiceProvider
                 ->uncompromised()
             : null,
         );
+    }
+
+    protected function configureFileUploads(): void
+    {
+        $maxFileSizeKilobytes = (int) config('chat.attachments.max_file_size_kilobytes');
+
+        config([
+            'livewire.temporary_file_upload.rules' => ['required', 'file', 'max:'.$maxFileSizeKilobytes],
+            'livewire.temporary_file_upload.max_upload_time' => (int) config('chat.attachments.livewire_max_upload_time'),
+        ]);
     }
 }

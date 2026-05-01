@@ -21,7 +21,7 @@
         <div class="flex items-start justify-between gap-3">
             <div>
                 <div class="text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ __('Attachments') }}</div>
-                <div class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{{ __('Up to 5 files, 10 MB each') }}</div>
+                <div class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{{ $this->attachmentLimitSummary() }}</div>
             </div>
 
             <flux:button

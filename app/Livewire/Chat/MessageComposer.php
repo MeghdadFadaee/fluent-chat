@@ -9,6 +9,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Number;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -41,16 +42,19 @@ class MessageComposer extends Component
     {
         $this->body = trim($this->body);
         $hasAttachments = $this->hasAttachments();
+        $maxAttachmentFiles = $this->maxAttachmentFiles();
+        $maxAttachmentFileSizeKilobytes = $this->maxAttachmentFileSizeKilobytes();
+        $maxAttachmentFileSizeLabel = $this->maxAttachmentFileSizeLabel();
 
         $validated = $this->validate([
             'body' => [$hasAttachments ? 'nullable' : 'required', 'string', 'max:4000'],
-            'attachments' => ['array', 'max:5'],
-            'attachments.*' => ['file', 'max:10240'],
+            'attachments' => ['array', 'max:'.$maxAttachmentFiles],
+            'attachments.*' => ['file', 'max:'.$maxAttachmentFileSizeKilobytes],
         ], [
             'body.required' => __('Write a message or attach a file before sending.'),
-            'attachments.max' => __('Attach up to :max files at a time.'),
+            'attachments.max' => __('Attach up to :max files at a time.', ['max' => $maxAttachmentFiles]),
             'attachments.*.file' => __('Each attachment must be a valid file.'),
-            'attachments.*.max' => __('Each attachment must be 10 MB or smaller.'),
+            'attachments.*.max' => __('Each attachment must be :size or smaller.', ['size' => $maxAttachmentFileSizeLabel]),
         ]);
 
         $conversation = $this->conversation();
@@ -172,6 +176,14 @@ class MessageComposer extends Component
         ];
     }
 
+    public function attachmentLimitSummary(): string
+    {
+        return __('Up to :count files, :size each', [
+            'count' => $this->maxAttachmentFiles(),
+            'size' => $this->maxAttachmentFileSizeLabel(),
+        ]);
+    }
+
     private function conversation(): Conversation
     {
         $conversation = Conversation::query()
@@ -188,6 +200,21 @@ class MessageComposer extends Component
         return collect($this->attachments)
             ->filter()
             ->isNotEmpty();
+    }
+
+    private function maxAttachmentFiles(): int
+    {
+        return (int) config('chat.attachments.max_files', 5);
+    }
+
+    private function maxAttachmentFileSizeKilobytes(): int
+    {
+        return (int) config('chat.attachments.max_file_size_kilobytes', 2 * 1024 * 1024);
+    }
+
+    private function maxAttachmentFileSizeLabel(): string
+    {
+        return Number::fileSize($this->maxAttachmentFileSizeKilobytes() * 1024);
     }
 
     private function emojiForCode(string $code): ?string

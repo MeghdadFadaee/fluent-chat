@@ -180,6 +180,42 @@ test('participants can send file messages', function () {
     Storage::disk('local')->assertExists($message->attachmentPath());
 });
 
+test('chat file uploads are configured for two gigabyte attachments', function () {
+    expect(config('chat.attachments.max_file_size_kilobytes'))->toBe(2 * 1024 * 1024)
+        ->and(config('livewire.temporary_file_upload.rules'))->toContain('max:2097152')
+        ->and(config('livewire.temporary_file_upload.max_upload_time'))->toBe(60);
+});
+
+test('participants can send files larger than the previous ten megabyte limit', function () {
+    Storage::fake('local');
+
+    $user = User::factory()->create();
+    $conversation = Conversation::factory()
+        ->direct()
+        ->for($user, 'creator')
+        ->create();
+
+    ConversationParticipant::factory()->for($conversation)->for($user)->create();
+
+    $this->actingAs($user);
+
+    Livewire::test(MessageComposer::class, ['conversationId' => $conversation->id])
+        ->set('attachments', [
+            UploadedFile::fake()->create('large-export.zip', 13 * 1024, 'application/zip'),
+        ])
+        ->call('sendMessage')
+        ->assertHasNoErrors();
+
+    $message = Message::query()
+        ->where('conversation_id', $conversation->id)
+        ->where('user_id', $user->id)
+        ->where('type', Message::TypeFile)
+        ->first();
+
+    expect($message)->not->toBeNull();
+    expect($message->attachmentName())->toBe('large-export.zip');
+});
+
 test('file metadata is captured before temporary uploads are moved', function () {
     Storage::fake('local');
 
