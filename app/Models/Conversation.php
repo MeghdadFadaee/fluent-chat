@@ -6,11 +6,11 @@ use Database\Factories\ConversationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Model;
 
 #[Fillable(['created_by_id', 'type', 'name', 'description'])]
 class Conversation extends Model
@@ -44,7 +44,7 @@ class Conversation extends Model
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'conversation_participants')
-            ->withPivot(['role', 'joined_at', 'last_read_at', 'muted_until'])
+            ->withPivot(['role', 'joined_at', 'last_read_at', 'muted_until', 'pinned_at'])
             ->withTimestamps();
     }
 

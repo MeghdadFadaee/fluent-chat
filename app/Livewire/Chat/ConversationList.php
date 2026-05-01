@@ -196,11 +196,18 @@ class ConversationList extends Component
             ->forUser($user)
             ->with([
                 'participants' => fn ($query) => $query
-                    ->select(['id', 'conversation_id', 'user_id', 'role', 'last_read_at'])
+                    ->select(['id', 'conversation_id', 'user_id', 'role', 'last_read_at', 'muted_until', 'pinned_at'])
                     ->with('user:id,name,email'),
                 'latestMessage' => fn ($query) => $query
                     ->select(['messages.id', 'messages.conversation_id', 'messages.user_id', 'messages.type', 'messages.body', 'messages.metadata', 'messages.created_at']),
                 'latestMessage.sender:id,name,email',
+            ])
+            ->addSelect([
+                'current_participant_pinned_at' => ConversationParticipant::query()
+                    ->select('pinned_at')
+                    ->whereColumn('conversation_participants.conversation_id', 'conversations.id')
+                    ->where('conversation_participants.user_id', $user->id)
+                    ->limit(1),
             ])
             ->withMax('messages', 'created_at')
             ->withCount([
@@ -224,6 +231,7 @@ class ConversationList extends Component
                             ->where('name', 'like', "%{$search}%")
                             ->orWhere('email', 'like', "%{$search}%")));
             }))
+            ->orderByDesc('current_participant_pinned_at')
             ->orderByDesc('messages_max_created_at')
             ->orderByDesc('updated_at')
             ->limit(40)
@@ -336,11 +344,27 @@ class ConversationList extends Component
         ]);
     }
 
+    public function isPinnedFor(Conversation $conversation): bool
+    {
+        return (bool) $this->currentParticipantFor($conversation)?->isPinned();
+    }
+
+    public function isMutedFor(Conversation $conversation): bool
+    {
+        return (bool) $this->currentParticipantFor($conversation)?->isMuted();
+    }
+
     public function isOnline(Conversation $conversation): bool
     {
         $participant = $this->otherParticipant($conversation);
 
         return $participant instanceof User && $participant->id % 3 !== 0;
+    }
+
+    private function currentParticipantFor(Conversation $conversation): ?ConversationParticipant
+    {
+        return $conversation->participants
+            ->first(fn (ConversationParticipant $participant) => $participant->user_id === Auth::id());
     }
 
     private function otherParticipant(Conversation $conversation): ?User

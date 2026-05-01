@@ -43,12 +43,36 @@
             <flux:heading size="sm">{{ __('Quick actions') }}</flux:heading>
 
             <div class="mt-3 grid grid-cols-3 gap-2">
-                <flux:tooltip :content="__('Mute')" position="top">
-                    <flux:button type="button" variant="filled" icon="bell-slash" aria-label="{{ __('Mute') }}" />
+                <flux:tooltip :content="$this->isMuted() ? __('Unmute') : __('Mute')" position="top">
+                    <flux:button
+                        type="button"
+                        :variant="$this->isMuted() ? 'primary' : 'filled'"
+                        icon="bell-slash"
+                        wire:click="toggleMute"
+                        wire:loading.attr="disabled"
+                        wire:target="toggleMute"
+                        aria-pressed="{{ $this->isMuted() ? 'true' : 'false' }}"
+                        aria-label="{{ $this->isMuted() ? __('Unmute conversation') : __('Mute conversation') }}"
+                        class="w-full"
+                    >
+                        {{ $this->isMuted() ? __('Muted') : __('Mute') }}
+                    </flux:button>
                 </flux:tooltip>
 
-                <flux:tooltip :content="__('Pin')" position="top">
-                    <flux:button type="button" variant="filled" icon="bookmark" aria-label="{{ __('Pin') }}" />
+                <flux:tooltip :content="$this->isPinned() ? __('Unpin') : __('Pin')" position="top">
+                    <flux:button
+                        type="button"
+                        :variant="$this->isPinned() ? 'primary' : 'filled'"
+                        icon="bookmark"
+                        wire:click="togglePin"
+                        wire:loading.attr="disabled"
+                        wire:target="togglePin"
+                        aria-pressed="{{ $this->isPinned() ? 'true' : 'false' }}"
+                        aria-label="{{ $this->isPinned() ? __('Unpin conversation') : __('Pin conversation') }}"
+                        class="w-full"
+                    >
+                        {{ $this->isPinned() ? __('Pinned') : __('Pin') }}
+                    </flux:button>
                 </flux:tooltip>
 
                 <flux:tooltip :content="__('Files')" position="top">
@@ -62,7 +86,9 @@
                             wire:target="openFiles"
                             aria-label="{{ __('Files') }}"
                             class="w-full"
-                        />
+                        >
+                            {{ __('Files') }}
+                        </flux:button>
 
                         @if ((int) $this->conversation->files_count > 0)
                             <span class="absolute -end-1 -top-1 flex min-w-5 items-center justify-center rounded-full bg-zinc-900 px-1 text-[10px] font-semibold text-white shadow-sm dark:bg-white dark:text-zinc-950">

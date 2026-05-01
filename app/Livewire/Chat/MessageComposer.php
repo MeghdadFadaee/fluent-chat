@@ -23,6 +23,8 @@ class MessageComposer extends Component
 
     public string $body = '';
 
+    public bool $emojiPickerOpen = false;
+
     /**
      * @var array<int, TemporaryUploadedFile>
      */
@@ -103,9 +105,30 @@ class MessageComposer extends Component
         });
 
         $this->reset('body', 'attachments');
+        $this->emojiPickerOpen = false;
         $this->resetValidation();
 
         $this->dispatch('message-created', conversationId: $conversation->id, messageId: $message->id);
+    }
+
+    public function toggleEmojiPicker(): void
+    {
+        $this->emojiPickerOpen = ! $this->emojiPickerOpen;
+    }
+
+    public function appendEmoji(string $code): void
+    {
+        $emoji = $this->emojiForCode($code);
+
+        if ($emoji === null) {
+            return;
+        }
+
+        $body = rtrim($this->body);
+        $this->body = $body === '' ? $emoji : $body.' '.$emoji;
+        $this->emojiPickerOpen = false;
+
+        $this->resetValidation('body');
     }
 
     public function removeAttachment(int $index): void
@@ -120,6 +143,33 @@ class MessageComposer extends Component
 
         $this->resetValidation('attachments');
         $this->resetValidation("attachments.{$index}");
+    }
+
+    /**
+     * @return array<int, array{code: string, label: string}>
+     */
+    public function emojiOptions(): array
+    {
+        return [
+            ['code' => '1F600', 'label' => __('Grinning face')],
+            ['code' => '1F604', 'label' => __('Smiling face')],
+            ['code' => '1F602', 'label' => __('Laughing face')],
+            ['code' => '1F60D', 'label' => __('Heart eyes')],
+            ['code' => '1F44B', 'label' => __('Wave')],
+            ['code' => '1F44D', 'label' => __('Thumbs up')],
+            ['code' => '1F44F', 'label' => __('Clap')],
+            ['code' => '1F64C', 'label' => __('Raised hands')],
+            ['code' => '1F525', 'label' => __('Fire')],
+            ['code' => '2728', 'label' => __('Sparkles')],
+            ['code' => '2705', 'label' => __('Check mark')],
+            ['code' => '1F680', 'label' => __('Rocket')],
+            ['code' => '1F4A1', 'label' => __('Idea')],
+            ['code' => '1F440', 'label' => __('Eyes')],
+            ['code' => '1F4CC', 'label' => __('Pin')],
+            ['code' => '1F4CE', 'label' => __('Paperclip')],
+            ['code' => '2764', 'label' => __('Heart')],
+            ['code' => '1F389', 'label' => __('Party')],
+        ];
     }
 
     private function conversation(): Conversation
@@ -138,6 +188,19 @@ class MessageComposer extends Component
         return collect($this->attachments)
             ->filter()
             ->isNotEmpty();
+    }
+
+    private function emojiForCode(string $code): ?string
+    {
+        $code = strtoupper($code);
+        $isAllowed = collect($this->emojiOptions())
+            ->contains(fn (array $emoji): bool => $emoji['code'] === $code);
+
+        if (! $isAllowed) {
+            return null;
+        }
+
+        return html_entity_decode('&#x'.$code.';', ENT_QUOTES, 'UTF-8');
     }
 
     public function render(): View

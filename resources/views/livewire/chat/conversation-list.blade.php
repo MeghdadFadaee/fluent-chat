@@ -48,6 +48,8 @@
                 @php
                     $selected = $selectedConversationId === $conversation->id;
                     $unreadCount = (int) ($conversation->unread_messages_count ?? 0);
+                    $isPinned = $this->isPinnedFor($conversation);
+                    $isMuted = $this->isMutedFor($conversation);
                 @endphp
 
                 <button
@@ -110,6 +112,28 @@
                                     'bg-white/15 text-white/80 dark:bg-zinc-950/10 dark:text-zinc-700' => $selected,
                                     'bg-sky-50 text-sky-700 dark:bg-sky-400/10 dark:text-sky-300' => ! $selected,
                                 ])>{{ __('Group') }}</span>
+                            @endif
+
+                            @if ($isPinned)
+                                <span @class([
+                                    'inline-flex shrink-0 items-center',
+                                    'text-amber-300 dark:text-amber-600' => $selected,
+                                    'text-amber-500 dark:text-amber-400' => ! $selected,
+                                ])>
+                                    <span class="sr-only">{{ __('Pinned') }}</span>
+                                    <flux:icon.bookmark class="size-3.5" />
+                                </span>
+                            @endif
+
+                            @if ($isMuted)
+                                <span @class([
+                                    'inline-flex shrink-0 items-center',
+                                    'text-white/60 dark:text-zinc-600' => $selected,
+                                    'text-zinc-400 dark:text-zinc-500' => ! $selected,
+                                ])>
+                                    <span class="sr-only">{{ __('Muted') }}</span>
+                                    <flux:icon.bell-slash class="size-3.5" />
+                                </span>
                             @endif
                         </div>
 

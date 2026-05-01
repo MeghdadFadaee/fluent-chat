@@ -65,7 +65,7 @@ class ConversationDetailsPanel extends Component
             ->forUser(Auth::user())
             ->with([
                 'participants' => fn ($query) => $query
-                    ->select(['id', 'conversation_id', 'user_id', 'role', 'joined_at'])
+                    ->select(['id', 'conversation_id', 'user_id', 'role', 'joined_at', 'muted_until', 'pinned_at'])
                     ->with('user:id,name,email'),
             ])
             ->withCount([
@@ -104,9 +104,71 @@ class ConversationDetailsPanel extends Component
         return Gate::allows('addMembers', $this->conversation);
     }
 
+    public function currentParticipant(): ConversationParticipant
+    {
+        $participant = $this->conversation->participants
+            ->first(fn (ConversationParticipant $participant) => $participant->user_id === Auth::id());
+
+        abort_unless($participant instanceof ConversationParticipant, 404);
+
+        return $participant;
+    }
+
+    public function isMuted(): bool
+    {
+        return $this->currentParticipant()->isMuted();
+    }
+
+    public function isPinned(): bool
+    {
+        return $this->currentParticipant()->isPinned();
+    }
+
     public function closeDetails(): void
     {
         $this->dispatch('conversation-details-toggled');
+    }
+
+    public function toggleMute(): void
+    {
+        Gate::authorize('view', $this->conversation);
+
+        $participant = $this->currentParticipant();
+        $wasMuted = $participant->isMuted();
+
+        $participant->forceFill([
+            'muted_until' => $wasMuted ? null : now()->addYear(),
+        ])->save();
+
+        unset($this->conversation);
+
+        Flux::toast(
+            variant: 'success',
+            text: $wasMuted ? __('Conversation unmuted.') : __('Conversation muted.'),
+        );
+
+        $this->dispatch('conversation-updated', conversationId: $this->conversationId);
+    }
+
+    public function togglePin(): void
+    {
+        Gate::authorize('view', $this->conversation);
+
+        $participant = $this->currentParticipant();
+        $wasPinned = $participant->isPinned();
+
+        $participant->forceFill([
+            'pinned_at' => $wasPinned ? null : now(),
+        ])->save();
+
+        unset($this->conversation);
+
+        Flux::toast(
+            variant: 'success',
+            text: $wasPinned ? __('Conversation unpinned.') : __('Conversation pinned.'),
+        );
+
+        $this->dispatch('conversation-updated', conversationId: $this->conversationId);
     }
 
     public function openAddMembers(): void

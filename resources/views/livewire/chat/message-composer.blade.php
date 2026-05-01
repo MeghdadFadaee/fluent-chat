@@ -79,6 +79,27 @@
         @enderror
     </div>
 
+    @if ($emojiPickerOpen)
+        <div
+            wire:key="emoji-picker"
+            class="mb-2 rounded-lg border border-zinc-200 bg-white p-2 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+        >
+            <div class="grid grid-cols-9 gap-1 sm:grid-cols-12">
+                @foreach ($this->emojiOptions() as $emoji)
+                    <button
+                        type="button"
+                        wire:key="emoji-option-{{ $emoji['code'] }}"
+                        wire:click="appendEmoji('{{ $emoji['code'] }}')"
+                        class="flex aspect-square min-h-9 items-center justify-center rounded-md text-xl transition hover:bg-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:hover:bg-zinc-800"
+                        aria-label="{{ __('Add :emoji emoji', ['emoji' => $emoji['label']]) }}"
+                    >
+                        {{ html_entity_decode('&#x'.$emoji['code'].';', ENT_QUOTES, 'UTF-8') }}
+                    </button>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     <div class="flex items-end gap-2 rounded-lg border border-zinc-200 bg-white p-2 shadow-sm transition focus-within:border-zinc-300 focus-within:ring-2 focus-within:ring-accent focus-within:ring-offset-2 focus-within:ring-offset-white dark:border-zinc-800 dark:bg-zinc-900 dark:focus-within:border-zinc-700 dark:focus-within:ring-offset-zinc-950">
         <flux:tooltip :content="__('Attach file')" position="top">
             <flux:button
@@ -101,7 +122,14 @@
         />
 
         <flux:tooltip :content="__('Emoji')" position="top">
-            <flux:button type="button" variant="ghost" icon="face-smile" aria-label="{{ __('Emoji') }}" />
+            <flux:button
+                type="button"
+                variant="ghost"
+                icon="face-smile"
+                wire:click="toggleEmojiPicker"
+                aria-label="{{ __('Emoji') }}"
+                aria-expanded="{{ $emojiPickerOpen ? 'true' : 'false' }}"
+            />
         </flux:tooltip>
 
         <flux:button

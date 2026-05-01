@@ -26,6 +26,7 @@ class ConversationParticipantFactory extends Factory
             'joined_at' => fake()->dateTimeBetween('-2 months', 'now'),
             'last_read_at' => fake()->optional(0.85)->dateTimeBetween('-2 weeks', 'now'),
             'muted_until' => null,
+            'pinned_at' => null,
         ];
     }
 

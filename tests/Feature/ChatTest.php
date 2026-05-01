@@ -123,6 +123,29 @@ test('participants can send messages', function () {
         ->exists())->toBeTrue();
 });
 
+test('participants can add emojis from the composer picker', function () {
+    $user = User::factory()->create();
+    $conversation = Conversation::factory()
+        ->direct()
+        ->for($user, 'creator')
+        ->create();
+
+    ConversationParticipant::factory()->for($conversation)->for($user)->create();
+
+    $emoji = html_entity_decode('&#x1F44D;', ENT_QUOTES, 'UTF-8');
+
+    $this->actingAs($user);
+
+    Livewire::test(MessageComposer::class, ['conversationId' => $conversation->id])
+        ->call('toggleEmojiPicker')
+        ->assertSet('emojiPickerOpen', true)
+        ->assertSee('Add Thumbs up emoji')
+        ->set('body', 'Looks good')
+        ->call('appendEmoji', '1F44D')
+        ->assertSet('body', 'Looks good '.$emoji)
+        ->assertSet('emojiPickerOpen', false);
+});
+
 test('participants can send file messages', function () {
     Storage::fake('local');
 
@@ -260,6 +283,67 @@ test('conversation details files action shows shared files', function () {
         ->assertSet('showFilesModal', true)
         ->assertSee('launch-plan.pdf')
         ->assertSee('Conversation files');
+});
+
+test('participants can mute and pin conversations from details', function () {
+    $user = User::factory()->create();
+    $conversation = Conversation::factory()
+        ->direct()
+        ->for($user, 'creator')
+        ->create();
+
+    $participant = ConversationParticipant::factory()->for($conversation)->for($user)->create();
+
+    $this->actingAs($user);
+
+    Livewire::test(ConversationDetailsPanel::class, ['conversationId' => $conversation->id])
+        ->call('toggleMute')
+        ->assertSee('Muted')
+        ->call('togglePin')
+        ->assertSee('Pinned');
+
+    $participant->refresh();
+
+    expect($participant->muted_until)->not->toBeNull()
+        ->and($participant->pinned_at)->not->toBeNull();
+
+    Livewire::test(ConversationDetailsPanel::class, ['conversationId' => $conversation->id])
+        ->call('toggleMute')
+        ->assertSee('Mute')
+        ->call('togglePin')
+        ->assertSee('Pin');
+
+    $participant->refresh();
+
+    expect($participant->muted_until)->toBeNull()
+        ->and($participant->pinned_at)->toBeNull();
+});
+
+test('pinned conversations stay at the top of the conversation list', function () {
+    $user = User::factory()->create();
+    $pinnedTeammate = User::factory()->create(['name' => 'Priority Partner']);
+    $regularTeammate = User::factory()->create(['name' => 'Regular Partner']);
+
+    $pinnedConversation = Conversation::factory()
+        ->direct()
+        ->for($user, 'creator')
+        ->create(['updated_at' => now()->subDay()]);
+
+    $regularConversation = Conversation::factory()
+        ->direct()
+        ->for($user, 'creator')
+        ->create(['updated_at' => now()]);
+
+    ConversationParticipant::factory()->for($pinnedConversation)->for($user)->create(['pinned_at' => now()]);
+    ConversationParticipant::factory()->for($pinnedConversation)->for($pinnedTeammate)->create();
+    ConversationParticipant::factory()->for($regularConversation)->for($user)->create();
+    ConversationParticipant::factory()->for($regularConversation)->for($regularTeammate)->create();
+
+    $this->actingAs($user);
+
+    Livewire::test(ConversationList::class)
+        ->assertSeeInOrder(['Priority Partner', 'Regular Partner'])
+        ->assertSee('Pinned');
 });
 
 test('participants can add people to a direct conversation', function () {
