@@ -23,7 +23,7 @@ Fluent Chat is a modern Laravel chat platform built with Laravel 13, Livewire 4,
 | Styling    | Tailwind CSS 4, Vite             |
 | Auth       | Laravel Fortify                  |
 | Database   | MySQL by default in this project |
-| Testing    | Pest 4, Laravel testing tools    |
+| Testing    | Pest 5, Laravel testing tools    |
 | Formatting | Laravel Pint                     |
 
 ## Main Routes
@@ -45,9 +45,9 @@ https://fluent-chat.test/dashboard
 
 ## Requirements
 
-- PHP 8.4+
+- PHP 8.4.1+
 - Composer
-- Node.js and npm
+- Node.js 22.13+ and npm
 - MySQL or another Laravel-supported database
 - Laravel Herd, Valet, Sail, or another local PHP environment
 
